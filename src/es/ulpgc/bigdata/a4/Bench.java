@@ -16,10 +16,11 @@ import org.apache.spark.api.java.JavaSparkContext;
 /**
  * Benchmark of strategy A for ONE configuration (n, workers) inside one Spark application.
  * Flags: --n --workers [--blocks] [--warmup 3] [--reps 10] [--out file.csv] [--verify true|false]
+ *        [--kernel ikj|blocked] [--kb 64] [--jb 256]
  */
 public final class Bench {
     private static final String HEADER =
-        "timestamp_utc,strategy,master_type,n,workers_expected,executors_observed,blocks,"
+        "timestamp_utc,strategy,kernel,kb,jb,master_type,n,workers_expected,executors_observed,blocks,"
         + "phase,rep,seed_a,seed_b,t_bcast_create_s,t_job_s,t_e2e_s,kernel_sum_s,"
         + "checksum,max_abs_diff,java_version,spark_version";
 
@@ -46,9 +47,17 @@ public final class Bench {
         int reps = Integer.parseInt(o.getOrDefault("reps", "10"));
         String out = o.getOrDefault("out", "results/raw_spark.csv");
         boolean verify = !"false".equals(o.get("verify"));
+        String kernel = o.getOrDefault("kernel", "ikj");
+        if (!kernel.equals("ikj") && !kernel.equals("blocked")) {
+            System.err.println("ERROR: --kernel must be ikj or blocked");
+            System.exit(4);
+        }
+        boolean blocked = kernel.equals("blocked");
+        int kb = Integer.parseInt(o.getOrDefault("kb", String.valueOf(Matrices.DEFAULT_KB)));
+        int jb = Integer.parseInt(o.getOrDefault("jb", String.valueOf(Matrices.DEFAULT_JB)));
         int verifyMaxN = 2000;   // sequential check is skipped above this size
 
-        SparkConf conf = new SparkConf().setAppName("a4-A-n" + n + "-w" + workers);
+        SparkConf conf = new SparkConf().setAppName("a4-A-" + kernel + "-n" + n + "-w" + workers);
         try (JavaSparkContext jsc = new JavaSparkContext(conf)) {
             String master = jsc.master();
             String masterType = master.startsWith("spark://") ? "standalone"
@@ -84,7 +93,7 @@ public final class Bench {
                 double[][] a = Matrices.random(n, sa);     // generation is outside the timers
                 double[][] b = Matrices.random(n, sb);
 
-                DistributedMultiply.Result r = DistributedMultiply.multiply(jsc, a, b, blocks);
+                DistributedMultiply.Result r = DistributedMultiply.multiply(jsc, a, b, blocks, blocked, kb, jb);
                 double checksum = Matrices.checksum(r.c);
 
                 String diff = "";
@@ -95,7 +104,9 @@ public final class Bench {
                 }
 
                 String line = String.join(",",
-                    Instant.now().toString(), "A_rowblocks_broadcast", masterType,
+                    Instant.now().toString(), "A_rowblocks_broadcast", kernel,
+                    blocked ? String.valueOf(kb) : "", blocked ? String.valueOf(jb) : "",
+                    masterType,
                     String.valueOf(n), String.valueOf(workers), String.valueOf(observed),
                     String.valueOf(Math.max(1, Math.min(blocks, n))),
                     isWarm ? "warmup" : "measured", String.valueOf(rep),
@@ -106,7 +117,7 @@ public final class Bench {
                 Files.write(outPath, (line + "\n").getBytes(StandardCharsets.UTF_8),
                             StandardOpenOption.CREATE, StandardOpenOption.APPEND);
                 System.out.println((isWarm ? "[warmup] " : "[rep " + rep + "] ")
-                    + "n=" + n + " w=" + workers + " e2e=" + f(r.tE2eS) + " s");
+                    + kernel + " n=" + n + " w=" + workers + " e2e=" + f(r.tE2eS) + " s");
             }
             if (bad) {
                 System.err.println("ERROR: result differs from the sequential reference");

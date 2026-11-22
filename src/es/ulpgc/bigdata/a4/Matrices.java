@@ -53,6 +53,42 @@ public final class Matrices {
         }
     }
 
+
+    public static final int DEFAULT_KB = 64;    // rows of B per tile
+    public static final int DEFAULT_JB = 256;   // columns of B per tile (tile = 64 x 256 doubles = 128 KiB)
+
+    /**
+     * Cache-blocked version of the i-k-j kernel (control experiment). B is processed in tiles of
+     * kb x jb that are reused for every row of the block. For every C[i][j] the contributions are
+     * still added in increasing k, so the result is bit-identical to multiplyRows.
+     */
+    public static void multiplyRowsBlocked(double[][] aRows, double[][] b, double[][] cRows, int kb, int jb) {
+        int n = b.length;
+        for (int kk = 0; kk < n; kk += kb) {
+            int kEnd = Math.min(kk + kb, n);
+            for (int jj = 0; jj < n; jj += jb) {
+                int jEnd = Math.min(jj + jb, n);
+                for (int i = 0; i < aRows.length; i++) {
+                    double[] ai = aRows[i];
+                    double[] ci = cRows[i];
+                    for (int k = kk; k < kEnd; k++) {
+                        double aik = ai[k];
+                        double[] bk = b[k];
+                        for (int j = jj; j < jEnd; j++) {
+                            ci[j] += aik * bk[j];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public static void multiplyRowsWith(boolean blocked, int kb, int jb,
+                                        double[][] aRows, double[][] b, double[][] cRows) {
+        if (blocked) multiplyRowsBlocked(aRows, b, cRows, kb, jb);
+        else multiplyRows(aRows, b, cRows);
+    }
+
     public static double[][] multiplySequential(double[][] a, double[][] b) {
         int n = b.length;
         double[][] c = new double[a.length][n];

@@ -20,7 +20,7 @@ foreach ($w in $WorkersList) {
     foreach ($n in $Sizes) {
         if ($n -ge 4000 -and $w -gt $MaxWorkersFor4000) {
             Write-Host "n=$n workers=$w : skipped (declared memory budget)"
-            Add-StatusRow -Csv $st -Line "$n,$w,,$mem,,,,0,,SKIPPED_MEMORY_BUDGET"
+            Add-StatusRow -Csv $st -Line "$n,$w,,$mem,,,,0,,SKIPPED_MEMORY_BUDGET,ikj"
             continue
         }
         $blocks = [int][math]::Min($n, $w * $BlocksPerWorker)

@@ -3,3 +3,6 @@
 . "$PSScriptRoot\env.ps1"
 $py = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'py' }
 & $py "$ProjectRoot\analysis\analyze.py"
+if ((Test-Path "$ProjectRoot\results\raw_control_spark.csv") -and (Test-Path "$ProjectRoot\results\raw_control_threads.csv")) {
+    & $py "$ProjectRoot\analysis\analyze_control.py"
+}

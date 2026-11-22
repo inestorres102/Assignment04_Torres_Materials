@@ -26,6 +26,20 @@ public final class Correctness {
             }
         }
 
+        // Blocked kernel must be bit-identical to the i-k-j kernel (n not multiple of the tile sizes)
+        for (int n : new int[] {1, 2, 5, 37, 64, 100, 129}) {
+            for (int[] t : new int[][] {{1, 1}, {3, 5}, {7, 11}, {64, 256}, {500, 500}}) {
+                double[][] a = Matrices.random(n, 7L + n);
+                double[][] b = Matrices.random(n, 77L + n);
+                double[][] c1 = new double[n][n];
+                double[][] c2 = new double[n][n];
+                Matrices.multiplyRows(a, b, c1);
+                Matrices.multiplyRowsBlocked(a, b, c2, t[0], t[1]);
+                check("blocked == ikj (bit-identical) n=" + n + " kb=" + t[0] + " jb=" + t[1],
+                      Matrices.maxAbsDiff(c1, c2) == 0.0);
+            }
+        }
+
         SparkConf conf = new SparkConf().setAppName("a4-correctness");
         try (JavaSparkContext jsc = new JavaSparkContext(conf)) {
             for (int n : new int[] {1, 2, 3, 10, 37, 64}) {
@@ -43,6 +57,9 @@ public final class Correctness {
                     double[][] cd = DistributedMultiply.multiply(jsc, a, b, blocks).c;
                     double[][] cs = Matrices.multiplySequential(a, b);
                     check("distributed == sequential" + tag, Matrices.maxAbsDiff(cd, cs) <= TOL);
+
+                    double[][] cb = DistributedMultiply.multiply(jsc, a, b, blocks, true, 7, 11).c;
+                    check("distributed blocked == sequential" + tag, Matrices.maxAbsDiff(cb, cs) <= TOL);
                 }
             }
         }

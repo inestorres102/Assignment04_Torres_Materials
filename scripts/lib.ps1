@@ -30,7 +30,7 @@ function Format-Inv([double]$v) {
 function Add-StatusRow {
     param([string]$Csv, [string]$Line)
     if (-not (Test-Path $Csv)) {
-        Add-Content -Path $Csv -Value 'n,workers,blocks,mem_per_executor_mb,peak_total_exec_ws_mb,peak_max_exec_ws_mb,peak_driver_ws_mb,samples,exit_code,status'
+        Add-Content -Path $Csv -Value 'n,workers,blocks,mem_per_executor_mb,peak_total_exec_ws_mb,peak_max_exec_ws_mb,peak_driver_ws_mb,samples,exit_code,status,kernel'
     }
     Add-Content -Path $Csv -Value $Line
 }
@@ -39,9 +39,10 @@ function Invoke-Bench {
     param(
         [int]$N, [int]$Workers, [int]$Blocks, [int]$MemMb,
         [int]$Warmup, [int]$Reps, [string]$Out, [string]$StatusCsv,
-        [int]$TimeoutSec = 900, [string]$Master = 'spark://127.0.0.1:7077'
+        [int]$TimeoutSec = 900, [string]$Master = 'spark://127.0.0.1:7077',
+        [string]$Kernel = 'ikj', [int]$KB = 64, [int]$JB = 256
     )
-    $tag = "n${N}_w${Workers}"
+    $tag = "n${N}_w${Workers}_${Kernel}"
     $log = "$ProjectRoot\logs\$tag.out"
     $err = "$ProjectRoot\logs\$tag.err"
     $samples = "$ProjectRoot\logs\$tag.rss"
@@ -57,9 +58,10 @@ function Invoke-Bench {
             '--conf', 'spark.driver.maxResultSize=2g',
             "$ProjectRoot\target\a4.jar",
             '--n', "$N", '--workers', "$Workers", '--blocks', "$Blocks",
-            '--warmup', "$Warmup", '--reps', "$Reps", '--out', $Out)
+            '--warmup', "$Warmup", '--reps', "$Reps", '--out', $Out,
+            '--kernel', $Kernel, '--kb', "$KB", '--jb', "$JB")
 
-    Write-Host ("[{0}] n={1} workers={2} blocks={3} mem/exec={4}MB ..." -f (Get-Date -Format 'HH:mm:ss'), $N, $Workers, $Blocks, $MemMb)
+    Write-Host ("[{0}] n={1} workers={2} blocks={3} kernel={4} mem/exec={5}MB ..." -f (Get-Date -Format 'HH:mm:ss'), $N, $Workers, $Blocks, $Kernel, $MemMb)
     $p = Start-Process -FilePath "$env:SPARK_HOME\bin\spark-submit.cmd" -ArgumentList $sa `
          -NoNewWindow -PassThru -RedirectStandardOutput $log -RedirectStandardError $err
     $null = $p.Handle
@@ -89,7 +91,7 @@ function Invoke-Bench {
             $peakDrv = Format-Inv ((($rows | Measure-Object drv -Maximum).Maximum) / 1024)
         }
     }
-    Add-StatusRow -Csv $StatusCsv -Line "$N,$Workers,$Blocks,$MemMb,$peakTot,$peakMx,$peakDrv,$cnt,$rc,$status"
+    Add-StatusRow -Csv $StatusCsv -Line "$N,$Workers,$Blocks,$MemMb,$peakTot,$peakMx,$peakDrv,$cnt,$rc,$status,$Kernel"
     Write-Host ("    -> {0} (exit {1}); peak executors total={2} MB, driver={3} MB" -f $status, $rc, $peakTot, $peakDrv)
     return $status
 }

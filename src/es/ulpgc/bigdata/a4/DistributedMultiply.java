@@ -28,6 +28,11 @@ public final class DistributedMultiply {
     }
 
     public static Result multiply(JavaSparkContext jsc, double[][] a, double[][] b, int blocks) {
+        return multiply(jsc, a, b, blocks, false, Matrices.DEFAULT_KB, Matrices.DEFAULT_JB);
+    }
+
+    public static Result multiply(JavaSparkContext jsc, double[][] a, double[][] b, int blocks,
+                                  final boolean blocked, final int kb, final int jb) {
         final int n = a.length;
         final LongAccumulator kernelNs = jsc.sc().longAccumulator("kernel_ns");
 
@@ -51,7 +56,7 @@ public final class DistributedMultiply {
             double[][] bm = bb.value();                 // broadcast fetch (not in kernel timer)
             long s = System.nanoTime();
             double[][] c = new double[blk.rows.length][bm.length];
-            Matrices.multiplyRows(blk.rows, bm, c);
+            Matrices.multiplyRowsWith(blocked, kb, jb, blk.rows, bm, c);
             kernelNs.add(System.nanoTime() - s);
             return new RowBlock(blk.start, c);
         });
