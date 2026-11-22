@@ -1,0 +1,6 @@
+Checksum cross-check (sum of all elements of C, measured repetitions)
+(n, rep) pairs compared: 60
+max relative spread across Spark configurations : 0.000e+00
+max relative spread across baseline configurations: 0.000e+00
+max relative difference Spark vs baseline        : 0.000e+00
+RESULT: PASS (all configurations computed the same product)
