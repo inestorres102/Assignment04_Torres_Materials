@@ -1,4 +1,0 @@
-timestamp_utc,strategy,master_type,n,workers_expected,executors_observed,blocks,phase,rep,seed_a,seed_b,t_bcast_create_s,t_job_s,t_e2e_s,kernel_sum_s,checksum,max_abs_diff,java_version,spark_version
-2026-11-22T11:16:44.852705700Z,A_rowblocks_broadcast,standalone,500,2,2,8,warmup,0,500000,1000000,0.133027,1.643741,1.776768,0.193264,31243938.204117,,21.0.13.1,4.1.4
-2026-11-22T11:16:45.310471900Z,A_rowblocks_broadcast,standalone,500,2,2,8,measured,1,500001,1000001,0.012142,0.260157,0.272299,0.097666,31303430.954734,0.000e+00,21.0.13.1,4.1.4
-2026-11-22T11:16:45.587448Z,A_rowblocks_broadcast,standalone,500,2,2,8,measured,2,500002,1000002,0.013998,0.236888,0.250885,0.060362,31157188.147582,,21.0.13.1,4.1.4

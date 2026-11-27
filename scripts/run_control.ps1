@@ -1,7 +1,7 @@
 # CONTROL EXPERIMENT: does the Spark plateau come from memory traffic of the unblocked i-k-j kernel?
 # Only the kernel changes (ikj vs cache-blocked); everything else is identical.
 #   Part 1: thread pool, same kernel and same task granularity (4 tasks per thread) as Spark
-#   Part 2: Spark standalone, both kernels alternated inside the same cluster session
+#   Part 2: Spark standalone, for each (n, workers) ikj runs first, then blocked, in the same cluster session
 # Output: results\raw_control_threads.csv, results\raw_control_spark.csv, results\control_*status.csv
 param(
     [int[]]$Sizes = @(2000, 4000),

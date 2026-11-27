@@ -1,21 +1,40 @@
-# Assignment 4 - Distributed matrix multiplication with Apache Spark (Java API)
+# Assignment 4 – Distributed matrix multiplication with Apache Spark (Java API)
 
-Strategy A: matrix A is split into row blocks (one RDD partition per block), matrix B is broadcast, and
+**Strategy A:** matrix A is split into row blocks (one RDD partition per block), matrix B is broadcast, and
 every task multiplies its block with the i-k-j triple loop of Assignment 3 (no BLAS, no library
-multiplication). A control experiment replaces the kernel by a cache-blocked one (bit-identical results).
+multiplication). A **control experiment** replaces the kernel by a cache-blocked one (bit-identical results).
 
-Environment: one laptop (Intel Core i7-12650H, 6 P-cores + 4 E-cores, 16 logical processors, 16 GB RAM),
-Windows 11 native. Spark standalone cluster with 1 master and p workers (1 core, 1 executor each):
-a **local multi-process** execution (allowed by the instructor); it does not measure network performance.
+Report: `Assignment04_Torres_Report.pdf` (submitted separately). Repository:
+https://github.com/inestorres102/Assignment04_Torres_Materials
+
+## Environment
+
+| Item | Value |
+|---|---|
+| Machine | One laptop, Intel Core i7-12650H (6 P-cores + 4 E-cores, 16 logical processors), 16 GB RAM |
+| OS | Windows 11 Home (native, no VM or WSL) |
+| Execution mode | Spark standalone cluster: 1 master and *p* workers (1 core and 1 executor each), a **local multi-process** execution (allowed by the instructor). It does **not** measure network performance. |
+| Spark settings | driver in client mode with 3 GB heap; `spark.rpc.message.maxSize=512`; `spark.driver.maxResultSize=2g`; `--executor-cores 1`; `--total-executor-cores p` |
+| Power | Windows "Balanced" plan. The sweeps were run on AC power (**declared, not logged during the runs**). |
+
+Two environment snapshots are kept, both written by `scripts\setup_check.ps1`:
+- `results/environment.txt`: taken on 22 Nov **before** the sweeps; it reported battery status 1 (not on AC power).
+- `results/environment_recheck.txt`: taken on 27 Nov with the laptop on AC power. It also shows `HADOOP_HOME` set, because winutils was configured after the first snapshot.
 
 ## Requirements
+
 - JDK 21 (Eclipse Temurin 21): `winget install EclipseAdoptium.Temurin.21.JDK`
 - Apache Spark 4.1.4 (pre-built for Hadoop 3, Scala 2.13) extracted to `C:\spark\spark-4.1.4-bin-hadoop3`
-- `winutils.exe` and `hadoop.dll` (Hadoop 3.3.x, community build, unofficial) in `C:\hadoop\bin` (required by Spark executors on Windows)
-- Python 3 with pandas, numpy, matplotlib: `python -m pip install -r analysis\requirements.txt`
+- `winutils.exe` and `hadoop.dll` (Hadoop 3.3.x, community build, **unofficial**) in `C:\hadoop\bin`
+  (required by Spark executors on Windows; `scripts\env.ps1` sets `HADOOP_HOME` only if `winutils.exe` exists)
+- Python 3 with pandas, NumPy and Matplotlib: `python -m pip install -r analysis\requirements.txt`
+  (exact versions used: `results/analysis_environment.txt`)
 - The project path must not contain spaces.
 
-## Commands (PowerShell, from the project folder)
+## Commands
+
+PowerShell, from the project folder:
+
 ```
 powershell -ExecutionPolicy Bypass -File scripts\setup_check.ps1    # toolchain check, writes results\environment.txt
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1          # compiles against Spark's jars -> target\a4.jar
@@ -26,46 +45,83 @@ powershell -ExecutionPolicy Bypass -File scripts\run_baseline.ps1   # sequential
 powershell -ExecutionPolicy Bypass -File scripts\run_control.ps1    # control experiment, blocked kernel (~40-70 min)
 powershell -ExecutionPolicy Bypass -File scripts\run_analysis.ps1   # tables in results\, figures in figures\
 ```
+
 Run the sweeps with the laptop on AC power, no other applications and no suspension. Delete the output of
-`smoke_test.ps1` and of any short test run before the real runs. `scripts\cluster.ps1 -Action stop` stops leftover Spark processes.
+`smoke_test.ps1` and of any short test run before the real runs. `scripts\cluster.ps1 -Action stop` stops
+leftover Spark processes.
 
 ## Source layout
-- `src/es/ulpgc/bigdata/a4/`: `Matrices` (generator, kernels), `RowBlock`, `DistributedMultiply` (strategy A),
-  `Bench` (Spark benchmark), `Correctness` (tests), `A3Kernels` + `Baseline` (Assignment 3 methods, re-measured),
-  `ControlBaseline` (thread pool with the same kernel and task granularity as Spark).
+
+- `src/es/ulpgc/bigdata/a4/`
+  - `Matrices`: generator and kernels
+  - `RowBlock`
+  - `DistributedMultiply`: strategy A
+  - `Bench`: Spark benchmark
+  - `Correctness`: tests
+  - `A3Kernels` + `Baseline`: Assignment 3 methods, re-measured
+  - `ControlBaseline`: thread pool with the same kernel and task granularity as Spark
 - `scripts/`: PowerShell scripts listed above (`env.ps1` auto-detects JDK 21 and Spark; override with
   `$env:A4_JAVA_HOME`, `$env:A4_SPARK_HOME`).
-- `analysis/`: `analyze.py` (main results), `analyze_control.py` (control experiment; decision criteria in its header).
+- `analysis/`: `analyze.py` (main results) and `analyze_control.py` (control experiment; decision criteria
+  fixed before the runs are in its header).
+- `figures/`: all figures of the report.
 
 ## Inputs
-`java.util.Random`, values in [0,1), row-major fill, seedA = 1000n + rep, seedB = 2000n + rep (same as Assignment 3).
-Generated outside all timers; nothing to download. Warm-up runs use other matrices (rep = 0).
 
-## Raw data (results/)
+`java.util.Random`, values in [0,1), `double`, row-major fill, seedA = 1000n + rep, seedB = 2000n + rep
+(same as Assignment 3). Generated outside all timers; nothing to download. Warm-up runs use other
+matrices (rep = 0).
+
+## Raw data (`results/`)
+
 | File | Content |
 |---|---|
 | `raw_spark.csv` | Main Spark sweep, every run (warm-ups have `phase=warmup`) |
 | `raw_baseline.csv` | Sequential and thread pool (Assignment 3 methods) |
 | `raw_control_spark.csv`, `raw_control_threads.csv` | Control experiment (column `kernel` = ikj / blocked) |
-| `config_status.csv`, `baseline_status.csv`, `control_*_status.csv` | Peak memory (Windows working set), exit code, status (OK / FAILED / TIMEOUT / SKIPPED_MEMORY_BUDGET) |
+| `config_status.csv`, `baseline_status.csv`, `control_*_status.csv` | Peak memory (Windows working set), exit code and status (see below) |
 | `summary_*.csv`, `scaling_table.csv`, `memory_table.csv`, `control_*.csv` | Generated by the analysis scripts |
-| `crosscheck.txt`, `correctness.txt`, `environment.txt`, `analysis_environment.txt` | Checks and environment |
+| `crosscheck.txt`, `correctness.txt` | Checksum cross-check and unit-test output |
+| `environment.txt`, `environment_recheck.txt`, `analysis_environment.txt` | Environment snapshots and analysis toolchain versions |
 
-Spark columns: `t_bcast_create_s` (broadcast creation), `t_job_s` (split + tasks + collect + assembly),
+**Status values:** `OK`, `FAILED`, `TIMEOUT`, and `SKIPPED_MEMORY_BUDGET`. The last one means the
+configuration was **not attempted** (it is not a failure); see "Protocol" for the rule.
+
+**Spark columns:** `t_bcast_create_s` (broadcast creation), `t_job_s` (split + tasks + collect + assembly),
 `t_e2e_s` = sum of both (end-to-end time), `kernel_sum_s` (sum over tasks of output allocation + kernel;
 aggregate task time, not wall-clock, never to be added to the others), `checksum`, `max_abs_diff`
 (only on the first measured repetition for n <= 2000).
 
 ## Protocol
-3 warm-ups (recorded, excluded) + 10 measured repetitions; median and IQR. Budgets: 900 s per Spark
-configuration (main sweep), 6000 MB total executor heap, n = 4000 only for p <= 8 workers (12 and 16 workers
-at n = 4000 were not attempted). Memory metric: Windows working set (sampled every 300 ms for Spark
-processes; polled every 200 ms for the baseline process).
+
+- 3 warm-ups (recorded, excluded) + 10 measured repetitions; median and IQR.
+- Baseline configurations are rotated across repetitions. In the Spark sweeps all repetitions of one
+  configuration run consecutively (not rotated).
+- Control experiment: for each (n, p) the i-k-j and blocked kernels run **one after the other (i-k-j first)**
+  in the same cluster session. n = 2000 (p = 1..16) and n = 4000 (p <= 8 for Spark, p <= 16 for the thread pool).
+- Time budgets: 900 s per Spark configuration (main sweep), 2400 s (control), 3600 s per size (baselines).
+- Executor heap = min(2048, max(512, floor(6000 / p))) MB, i.e. 2048 (p = 1, 2), 1500 (p = 4), 750 (p = 8)
+  and 512 (p = 12, 16). The 512 MB floor makes the total 6144 and 8192 MB for p = 12, 16, **above the nominal
+  6000 MB budget**.
+- n = 4000 was not run for p > 8: script parameter `MaxWorkersFor4000 = 8`, a safety cutoff set before the sweep
+  (status `SKIPPED_MEMORY_BUDGET`). It was not tested by running it.
+- Number of tasks: 4 per worker (4p), so task granularity also changes with p.
+- Memory metric: Windows working set (sampled every 300 ms for Spark processes; polled every 200 ms for the
+  baseline process). Peaks are per configuration (warm-ups and repetitions together).
+- Correctness: unit tests (identity, zero, distributed == sequential, blocked == i-k-j), absolute tolerance 1e-9;
+  checksum cross-check of all runs (`results/crosscheck.txt`).
 
 ## Known limitations
-Single machine, local multi-process execution; configurations not rotated in the Spark sweeps; number of
-tasks (4 per worker) and executor heap change together with the number of workers; task-level metrics
-(deserialisation, shuffle) not collected; no strategy with a shuffle (2D blocks) implemented.
+
+- Single machine, local multi-process execution; no real network.
+- Configurations not rotated in the Spark sweeps; in the control experiment the blocked kernel always ran after
+  the i-k-j kernel for each (n, p), so slow drifts (e.g. thermal) could bias the comparison.
+- Number of tasks (4 per worker) and executor heap change together with the number of workers.
+- The 6000 MB heap budget is exceeded for p = 12, 16; the reported memory is the measured working set.
+- Power state during the sweeps was not logged (Balanced plan).
+- Reference check against the sequential result only for n <= 2000 (checksums agree for all sizes).
+- Task-level metrics (deserialisation, shuffle) not collected; no strategy with a shuffle (2D blocks) implemented.
 
 ## Reused materials
-Sequential and thread-pool algorithms, generator and seeds: Assignment 3 (`MatrixOperations.java`), same algorithms.
+
+Sequential and thread-pool algorithms, generator and seeds: Assignment 3 (`MatrixOperations.java`), same algorithms, re-measured here with JDK 21.
